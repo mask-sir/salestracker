@@ -1,5 +1,20 @@
-document.addEventListener('DOMContentLoaded', () => {
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
+// TODO: Replace with your Firebase project config
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
+document.addEventListener('DOMContentLoaded', () => {
     // --- DOM References ---
     const hamburgerBtn = document.getElementById('hamburger-btn');
     const sidebar = document.getElementById('sidebar');
@@ -14,25 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const newMonthCancelBtn = document.getElementById('new-month-cancel');
     const scannerModal = document.getElementById('scanner-modal');
     const scannerCancelBtn = document.getElementById('scanner-cancel-btn');
-
-
-    // --- Sidebar Toggle Logic ---
-    const toggleSidebar = () => {
-        sidebar.classList.toggle('show');
-        sidebarOverlay.classList.toggle('hidden');
-        setTimeout(() => {
-            sidebarOverlay.classList.toggle('opacity-0');
-        }, 10);
-    };
-
-    hamburgerBtn.addEventListener('click', toggleSidebar);
-    sidebarOverlay.addEventListener('click', toggleSidebar);
-    
-    mainNav.addEventListener('click', (e) => {
-        if (e.target.closest('a') && window.innerWidth < 768) {
-            toggleSidebar();
-        }
-    });
 
     // --- App State ---
     let appState = {
@@ -214,37 +210,32 @@ document.addEventListener('DOMContentLoaded', () => {
         window.scrollTo(0, 0);
     }
     
-    // --- LOCAL STORAGE ---
-    const saveState = () => {
-        try {
-            localStorage.setItem('salesProData_v10', JSON.stringify(appState));
-        } catch (e) { console.error("Error saving state:", e); }
+// --- FIREBASE SAVE/LOAD ---
+const saveState = async () => {
+    try {
+        const stateRef = doc(db, "salesApp", "state");
+        await setDoc(stateRef, appState);
+        console.log("State saved to Firestore");
+    } catch (e) {
+        console.error("Error saving state:", e);
     }
-    const loadState = () => {
-        try {
-            const savedData = localStorage.getItem('salesProData_v10');
-            if (savedData) {
-                appState = JSON.parse(savedData);
-            } else {
-                appState.productDatabase = [{ barcode: '8901234567890', model: 'VIVO Y200 (8+128)', mrp: 18999, incentive: 500, stockMM: 10, stockMax: 5 }];
-                appState.productDatabase.push({ barcode: '8901234567891', model: 'VIVO Y19 (6+128)', mrp: 12499, incentive: 350, stockMM: 8, stockMax: 12 });
-                const today = new Date();
-                const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-                const monthName = today.toLocaleString('default', { month: 'long', year: 'numeric' });
-                appState.salesLedger = {};
-                appState.salesLedger[monthKey] = { name: monthName, sales: [] };
-                appState.currentMonthView = monthKey;
-            }
-            if (!appState.currentMonthView) {
-                const monthKeys = Object.keys(appState.salesLedger);
-                appState.currentMonthView = monthKeys.length > 0 ? monthKeys[monthKeys.length - 1] : 'all-time';
-            }
-        } catch (e) {
-            console.error("Error loading state:", e);
-            appState = { productDatabase: [], salesLedger: {}, currentMonthView: 'all-time' };
-        }
-    }
+};
 
+const loadState = async () => {
+    try {
+        const stateRef = doc(db, "salesApp", "state");
+        const snapshot = await getDoc(stateRef);
+        if (snapshot.exists()) {
+            appState = snapshot.data();
+        } else {
+            console.log("No saved state, initializing default data...");
+            // your default appState setup
+        }
+    } catch (e) {
+        console.error("Error loading state:", e);
+        appState = { productDatabase: [], salesLedger: {}, currentMonthView: 'all-time' };
+    }
+};
     // --- BARCODE SCANNER ---
     const playScanSound = () => {
         try {
@@ -600,11 +591,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
-    // --- INITIALIZATION ---
-    const initializeApp = () => {
-        loadState();
-        const initialPage = window.location.hash.substring(1) || 'home';
-        showPage(initialPage);
+    // --- INITIALIZATION ---const initializeApp = async () => {
+    await loadState();   // wait until Firestore loads
+    const initialPage = window.location.hash.substring(1) || 'home';
+    showPage(initialPage);
         
         window.addEventListener('hashchange', () => showPage(window.location.hash.substring(1) || 'home'));
         messageCloseBtn.addEventListener('click', () => messageModal.classList.add('hidden'));
