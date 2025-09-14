@@ -1,19 +1,3 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-
-// TODO: Replace with your Firebase project config
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM References ---
     const hamburgerBtn = document.getElementById('hamburger-btn');
@@ -29,6 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const newMonthCancelBtn = document.getElementById('new-month-cancel');
     const scannerModal = document.getElementById('scanner-modal');
     const scannerCancelBtn = document.getElementById('scanner-cancel-btn');
+
+    // --- Firebase reference from index.html ---
+    const db = window.db;
 
     // --- App State ---
     let appState = {
