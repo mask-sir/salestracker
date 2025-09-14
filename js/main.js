@@ -1,22 +1,5 @@
-// --- FIREBASE SETUP ---
-const firebaseConfig = {
-  apiKey: "AIzaSyCAjL7T72-kq6DL7gWzzfpqswcNTqdkjZ0",
-  authDomain: "sales-pro-83fc2.firebaseapp.com",
-  databaseURL: "https://sales-pro-83fc2-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "sales-pro-83fc2",
-  storageBucket: "sales-pro-83fc2.firebasestorage.app",
-  messagingSenderId: "727475911328",
-  appId: "1:727475911328:web:b484d326d578d58819a7c5",
-  measurementId: "G-MRK7K77X9T"
-};
-
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-
-// Firestore reference
-const db = firebase.firestore();
-
 document.addEventListener('DOMContentLoaded', () => {
+
     // --- App State ---
     let appState = {
         productDatabase: [],
@@ -189,133 +172,38 @@ document.addEventListener('DOMContentLoaded', () => {
         window.scrollTo(0, 0);
     }
     
-    // --- FIRESTORE FUNCTIONS ---
-    // Products
-    async function saveProduct(product) {
+    // --- LOCAL STORAGE ---
+    const saveState = () => {
         try {
-            await db.collection("products").doc(product.barcode).set(product);
-            showMessage("Product saved successfully!");
-        } catch (error) {
-            console.error("Error saving product:", error);
-            showMessage("Error saving product: " + error.message);
+            localStorage.setItem('salesProData_v3', JSON.stringify(appState));
+        } catch (e) {
+            console.error("Error saving state to localStorage:", e);
         }
     }
-
-    async function deleteProduct(barcode) {
+    const loadState = () => {
         try {
-            await db.collection("products").doc(barcode).delete();
-            showMessage("Product deleted successfully!");
-        } catch (error) {
-            console.error("Error deleting product:", error);
-            showMessage("Error deleting product: " + error.message);
-        }
-    }
-
-    async function loadProducts() {
-        try {
-            const snapshot = await db.collection("products").get();
-            appState.productDatabase = snapshot.docs.map(doc => doc.data());
-        } catch (error) {
-            console.error("Error loading products:", error);
-            showMessage("Error loading products: " + error.message);
-        }
-    }
-
-    // Sales
-    async function saveSale(monthKey, sale) {
-        try {
-            await db.collection("sales").doc(monthKey)
-                .collection("entries").doc(String(sale.id)).set(sale);
-            showMessage("Sale logged successfully!");
-        } catch (error) {
-            console.error("Error saving sale:", error);
-            showMessage("Error saving sale: " + error.message);
-        }
-    }
-
-    async function deleteSaleFromDb(monthKey, saleId) {
-        try {
-            await db.collection("sales").doc(monthKey)
-                .collection("entries").doc(String(saleId)).delete();
-            showMessage("Sale deleted successfully!");
-        } catch (error) {
-            console.error("Error deleting sale:", error);
-            showMessage("Error deleting sale: " + error.message);
-        }
-    }
-
-    async function loadSales(monthKey) {
-        try {
-            const snapshot = await db.collection("sales").doc(monthKey).collection("entries").get();
-            return snapshot.docs.map(doc => doc.data());
-        } catch (error) {
-            console.error("Error loading sales:", error);
-            showMessage("Error loading sales: " + error.message);
-            return [];
-        }
-    }
-
-    // App State Management
-    async function saveState() {
-        try {
-            // Save current month view
-            await db.collection("appState").doc("settings").set({
-                currentMonthView: appState.currentMonthView
-            });
-
-            // Save sales ledger structure
-            await db.collection("appState").doc("salesLedger").set({
-                months: Object.keys(appState.salesLedger).map(key => ({
-                    key,
-                    name: appState.salesLedger[key].name
-                }))
-            });
-
-        } catch (error) {
-            console.error("Error saving app state:", error);
-        }
-    }
-
-    async function loadState() {
-        try {
-            // Load products
-            await loadProducts();
-
-            // Load app settings
-            const settingsDoc = await db.collection("appState").doc("settings").get();
-            if (settingsDoc.exists) {
-                const settings = settingsDoc.data();
-                appState.currentMonthView = settings.currentMonthView || '';
+            const savedData = localStorage.getItem('salesProData_v3');
+            if (savedData) {
+                appState = JSON.parse(savedData);
+            } else {
+                // Setup with new structure if no data exists
+                appState.productDatabase = [{ barcode: '8901234567890', model: 'VIVO Y200 (8+128)', mrp: 18999, stockMM: 10, stockMax: 5 }];
+                appState.productDatabase.push({ barcode: '8901234567891', model: 'VIVO Y19 (6+128)', mrp: 12499, stockMM: 8, stockMax: 12 });
+                const today = new Date();
+                const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                const monthName = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+                appState.salesLedger = {}; // Ensure it's an object
+                appState.salesLedger[monthKey] = { name: monthName, sales: [] };
+                appState.currentMonthView = monthKey;
             }
-
-            // Load sales ledger structure
-            const salesLedgerDoc = await db.collection("appState").doc("salesLedger").get();
-            if (salesLedgerDoc.exists) {
-                const salesLedgerData = salesLedgerDoc.data();
-                appState.salesLedger = {};
-                
-                // Initialize ledger structure
-                for (const month of salesLedgerData.months || []) {
-                    appState.salesLedger[month.key] = {
-                        name: month.name,
-                        sales: await loadSales(month.key)
-                    };
-                }
-            }
-
-            // Set default current month view if none exists
             if (!appState.currentMonthView) {
                 const monthKeys = Object.keys(appState.salesLedger);
-                if (monthKeys.length > 0) {
-                    appState.currentMonthView = monthKeys[monthKeys.length - 1];
-                } else {
-                    appState.currentMonthView = 'all-time';
-                }
+                appState.currentMonthView = monthKeys.length > 0 ? monthKeys[monthKeys.length - 1] : 'all-time';
             }
-
-        } catch (error) {
-            console.error("Error loading app state:", error);
-            showMessage("Error loading data: " + error.message);
+        } catch (e) {
+            console.error("Error loading state from localStorage:", e);
+            // Reset to a default state if there's a parsing error
+            appState = { productDatabase: [], salesLedger: {}, currentMonthView: 'all-time' };
         }
     }
 
@@ -436,16 +324,16 @@ document.addEventListener('DOMContentLoaded', () => {
             tableBody.appendChild(row);
         });
 
-        tableBody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async (e) => {
+        tableBody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', (e) => {
             const barcode = e.target.dataset.barcode;
             if (confirm(`Are you sure you want to delete product with barcode ${barcode}? This is irreversible.`)) {
-                await deleteProduct(barcode);
                 appState.productDatabase = appState.productDatabase.filter(p => p.barcode !== barcode);
+                saveState();
                 renderProductPage();
             }
         }));
 
-        form.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
             const barcode = document.getElementById('product-barcode').value;
             if (!barcode.trim()) {
@@ -463,9 +351,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 stockMM: parseInt(document.getElementById('product-stock-mm').value, 10) || 0,
                 stockMax: parseInt(document.getElementById('product-stock-max').value, 10) || 0
             };
-            
-            await saveProduct(newProduct);
             appState.productDatabase.push(newProduct);
+            saveState();
             renderProductPage();
             form.reset();
         });
@@ -499,10 +386,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderReportPage = () => {
        renderMonthSelector('report-month-selector-container', true);
        renderSalesReport(appState.currentMonthView);
-       }
+    }
     
     // --- CORE LOGIC ---
-    const handleStockUpdate = async (e) => {
+    const handleStockUpdate = (e) => {
         const { barcode, shop, action } = e.currentTarget.dataset;
         const product = appState.productDatabase.find(p => p.barcode === barcode);
         if (!product) return;
@@ -512,11 +399,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (action === 'incr') product[stockField]++;
         else if (action === 'decr' && product[stockField] > 0) product[stockField]--;
         
-        await saveProduct(product);
+        saveState();
         renderStockPage();
     }
     
-    const addSale = async (e) => {
+    const addSale = (e) => {
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
@@ -553,18 +440,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         salesInMonth.push(newSale);
-        
-        // Save to Firebase
-        await Promise.all([
-            saveProduct(product),
-            saveSale(monthKey, newSale)
-        ]);
-        
+        saveState();
+        showMessage("Sale logged successfully!");
         form.reset();
         document.getElementById('sale-date').valueAsDate = new Date();
     }
 
-    const deleteSale = async (saleId, monthKey) => {
+    const deleteSale = (saleId, monthKey) => {
         if (!appState.salesLedger[monthKey]) return;
         const salesInMonth = appState.salesLedger[monthKey].sales;
         const saleIndex = salesInMonth.findIndex(s => s.id === saleId);
@@ -580,12 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         salesInMonth.forEach((s, i) => s.sl = i + 1);
 
-        // Save to Firebase
-        await Promise.all([
-            product ? saveProduct(product) : Promise.resolve(),
-            deleteSaleFromDb(monthKey, saleId)
-        ]);
-        
+        saveState();
         renderSalesTable();
     }
 
@@ -614,9 +491,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const selector = document.getElementById(`month-selector-${containerId}`);
         selector.value = appState.currentMonthView;
 
-        selector.addEventListener('change', async (e) => {
+        selector.addEventListener('change', (e) => {
             appState.currentMonthView = e.target.value;
-            await saveState();
+            saveState();
             const currentPageId = document.querySelector('.page:not(.hidden)').id.replace('page-', '');
             showPage(currentPageId);
         });
@@ -660,11 +537,11 @@ document.addEventListener('DOMContentLoaded', () => {
             tableBody.appendChild(row);
         });
 
-        tableBody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async (e) => {
+        tableBody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', (e) => {
              const saleId = parseInt(e.target.dataset.id, 10);
              const monthKey = e.target.dataset.month;
              if(confirm('Are you sure you want to delete this sale? This will restore the stock count.')) {
-                 await deleteSale(saleId, monthKey);
+                 deleteSale(saleId, monthKey);
              }
         }));
     }
@@ -743,11 +620,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
     // --- INITIALIZATION ---
-    const initializeApp = async () => {
-        showMessage("Loading data from Firebase...");
-        await loadState();
-        messageModal.classList.add('hidden');
-        
+    const initializeApp = () => {
+        loadState();
         const initialPage = window.location.hash.substring(1) || 'home';
         showPage(initialPage);
         
@@ -759,7 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messageCloseBtn.addEventListener('click', () => messageModal.classList.add('hidden'));
         scannerCancelBtn.addEventListener('click', stopScanner);
 
-        newMonthForm.addEventListener('submit', async (e) => {
+        newMonthForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const monthInput = document.getElementById('new-month-input').value; // YYYY-MM
             if (!monthInput) {
@@ -775,8 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             appState.salesLedger[monthInput] = { name: monthName, sales: [] };
             appState.currentMonthView = monthInput;
-            
-            await saveState();
+            saveState();
             newMonthModal.classList.add('hidden');
             const currentPageId = document.querySelector('.page:not(.hidden)').id.replace('page-', '');
             showPage(currentPageId);
