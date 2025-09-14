@@ -1,4 +1,7 @@
+import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
 document.addEventListener('DOMContentLoaded', () => {
+
     // --- DOM References ---
     const hamburgerBtn = document.getElementById('hamburger-btn');
     const sidebar = document.getElementById('sidebar');
@@ -14,8 +17,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const scannerModal = document.getElementById('scanner-modal');
     const scannerCancelBtn = document.getElementById('scanner-cancel-btn');
 
-    // --- Firebase reference from index.html ---
+
+    // --- Sidebar Toggle Logic ---
+    const toggleSidebar = () => {
+        sidebar.classList.toggle('show');
+        sidebarOverlay.classList.toggle('hidden');
+        setTimeout(() => {
+            sidebarOverlay.classList.toggle('opacity-0');
+        }, 10);
+    };
+
+    if (hamburgerBtn) hamburgerBtn.addEventListener('click', toggleSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', toggleSidebar);
+
+    if (mainNav) mainNav.addEventListener('click', (e) => {
+        if (e.target.closest('a') && window.innerWidth < 768) {
+            toggleSidebar();
+        }
+    });
+
+    // --- Firebase reference (set in index.html) ---
     const db = window.db;
+    const useFirestore = typeof db !== 'undefined' && db !== null;
 
     // --- App State ---
     let appState = {
@@ -31,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'home': `
                 <h2 class="text-3xl font-bold text-slate-800 mb-2">Dashboard</h2>
                 <p class="text-slate-500 mb-8">Live overview of your sales and stock.</p>
-                
+
                 <div class="glass-ui rounded-xl shadow-lg p-6 mb-8 text-center border border-slate-200/75">
                     <h3 class="font-semibold text-slate-500 text-lg">All-Time Sales Value</h3>
                     <p id="all-time-sales" class="text-5xl font-extrabold text-transparent bg-clip-text brand-gradient mt-2">₹0.00</p>
@@ -182,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!pageId) pageId = 'home';
         allPages.forEach(p => p.classList.toggle('hidden', p.id !== `page-${pageId}`));
         mainNav.querySelectorAll('.nav-link').forEach(link => link.classList.toggle('active', link.hash === `#${pageId}`));
-        
+
         const targetPage = document.getElementById(`page-${pageId}`);
         targetPage.innerHTML = getPageTemplate(pageId);
 
@@ -196,33 +219,67 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         window.scrollTo(0, 0);
     }
-    
-// --- FIREBASE SAVE/LOAD ---
-const saveState = async () => {
-    try {
-        const stateRef = doc(db, "salesApp", "state");
-        await setDoc(stateRef, appState);
-        console.log("State saved to Firestore");
-    } catch (e) {
-        console.error("Error saving state:", e);
-    }
-};
 
-const loadState = async () => {
-    try {
-        const stateRef = doc(db, "salesApp", "state");
-        const snapshot = await getDoc(stateRef);
-        if (snapshot.exists()) {
-            appState = snapshot.data();
-        } else {
-            console.log("No saved state, initializing default data...");
-            // your default appState setup
+    // --- FIREBASE / LOCAL SAVE & LOAD ---
+    const saveState = async () => {
+        try {
+            if (useFirestore) {
+                const stateRef = doc(db, "salesApp", "state");
+                await setDoc(stateRef, appState);
+                console.log("State saved to Firestore");
+            } else {
+                localStorage.setItem('salesProData_v10', JSON.stringify(appState));
+                console.log("State saved to localStorage (fallback)");
+            }
+        } catch (e) { console.error("Error saving state:", e); }
+    };
+
+    const loadState = async () => {
+        try {
+            if (useFirestore) {
+                const stateRef = doc(db, "salesApp", "state");
+                const snapshot = await getDoc(stateRef);
+                if (snapshot.exists()) {
+                    appState = snapshot.data();
+                } else {
+                    // Initialize default demo data if no state exists
+                    appState.productDatabase = [{ barcode: '8901234567890', model: 'VIVO Y200 (8+128)', mrp: 18999, incentive: 500, stockMM: 10, stockMax: 5 }];
+                    appState.productDatabase.push({ barcode: '8901234567891', model: 'VIVO Y19 (6+128)', mrp: 12499, incentive: 350, stockMM: 8, stockMax: 12 });
+                    const today = new Date();
+                    const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                    const monthName = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+                    appState.salesLedger = {};
+                    appState.salesLedger[monthKey] = { name: monthName, sales: [] };
+                    appState.currentMonthView = monthKey;
+                    await saveState();
+                }
+            } else {
+                const savedData = localStorage.getItem('salesProData_v10');
+                if (savedData) {
+                    appState = JSON.parse(savedData);
+                } else {
+                    appState.productDatabase = [{ barcode: '8901234567890', model: 'VIVO Y200 (8+128)', mrp: 18999, incentive: 500, stockMM: 10, stockMax: 5 }];
+                    appState.productDatabase.push({ barcode: '8901234567891', model: 'VIVO Y19 (6+128)', mrp: 12499, incentive: 350, stockMM: 8, stockMax: 12 });
+                    const today = new Date();
+                    const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                    const monthName = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+                    appState.salesLedger = {};
+                    appState.salesLedger[monthKey] = { name: monthName, sales: [] };
+                    appState.currentMonthView = monthKey;
+                    await saveState();
+                }
+            }
+
+            if (!appState.currentMonthView) {
+                const monthKeys = Object.keys(appState.salesLedger);
+                appState.currentMonthView = monthKeys.length > 0 ? monthKeys[monthKeys.length - 1] : 'all-time';
+            }
+        } catch (e) {
+            console.error("Error loading state:", e);
+            appState = { productDatabase: [], salesLedger: {}, currentMonthView: 'all-time' };
         }
-    } catch (e) {
-        console.error("Error loading state:", e);
-        appState = { productDatabase: [], salesLedger: {}, currentMonthView: 'all-time' };
     }
-};
+
     // --- BARCODE SCANNER ---
     const playScanSound = () => {
         try {
@@ -239,14 +296,15 @@ const loadState = async () => {
     const startScanner = (targetInputId) => {
         scannerModal.classList.remove('hidden');
         document.getElementById('scanner-status').textContent = 'Initializing camera...';
-        
+
         const qrCodeSuccessCallback = (decodedText, decodedResult) => {
             playScanSound();
             stopScanner();
             document.getElementById(targetInputId).value = decodedText;
             showMessage(`Barcode scanned successfully!`);
             if (targetInputId === 'sale-barcode') {
-                document.getElementById('fetch-btn').click();
+                const fetchBtn = document.getElementById('fetch-btn');
+                if (fetchBtn) fetchBtn.click();
             }
         };
 
@@ -279,27 +337,34 @@ const loadState = async () => {
     // --- RENDER FUNCTIONS ---
     const renderHomePage = () => {
         const allTimeSales = Object.values(appState.salesLedger).flatMap(m => m.sales).reduce((sum, s) => sum + s.mrp, 0);
-        document.getElementById('all-time-sales').textContent = formatCurrency(allTimeSales);
+        const allTimeSalesEl = document.getElementById('all-time-sales');
+        if (allTimeSalesEl) allTimeSalesEl.textContent = formatCurrency(allTimeSales);
 
         let monthKey = appState.currentMonthView === 'all-time' ? (Object.keys(appState.salesLedger).sort().reverse()[0] || null) : appState.currentMonthView;
-        
+
         const monthSalesData = (monthKey && appState.salesLedger[monthKey]?.sales) || [];
         const monthSales = monthSalesData.reduce((sum, s) => sum + s.mrp, 0);
         const monthIncentives = monthSalesData.reduce((sum, s) => sum + (s.incentive || 0), 0);
 
         const stockMM = appState.productDatabase.reduce((sum, p) => sum + p.stockMM, 0);
         const stockMax = appState.productDatabase.reduce((sum, p) => sum + p.stockMax, 0);
-        
-        document.getElementById('month-sales').textContent = formatCurrency(monthSales);
-        document.getElementById('month-incentives').textContent = formatCurrency(monthIncentives);
-        document.getElementById('total-stock-mm').textContent = stockMM;
-        document.getElementById('total-stock-max').textContent = stockMax;
-        
-        document.getElementById('quick-actions').addEventListener('click', e => { if (e.target.closest('a')) window.location.hash = e.target.closest('a').hash; });
+
+        const monthSalesEl = document.getElementById('month-sales');
+        if (monthSalesEl) monthSalesEl.textContent = formatCurrency(monthSales);
+        const monthIncentivesEl = document.getElementById('month-incentives');
+        if (monthIncentivesEl) monthIncentivesEl.textContent = formatCurrency(monthIncentives);
+        const totalStockMMEl = document.getElementById('total-stock-mm');
+        if (totalStockMMEl) totalStockMMEl.textContent = stockMM;
+        const totalStockMaxEl = document.getElementById('total-stock-max');
+        if (totalStockMaxEl) totalStockMaxEl.textContent = stockMax;
+
+        const quickActions = document.getElementById('quick-actions');
+        if (quickActions) quickActions.addEventListener('click', e => { if (e.target.closest('a')) window.location.hash = e.target.closest('a').hash; });
     }
 
     const renderStockPage = () => {
         const tableBody = document.getElementById('stock-table-body');
+        if (!tableBody) return;
         tableBody.innerHTML = appState.productDatabase.length === 0 ? `<tr><td colspan="4" class="text-center p-6 text-slate-500">No products added.</td></tr>` : 
             appState.productDatabase.map(p => `
                 <tr>
@@ -316,18 +381,20 @@ const loadState = async () => {
                     </div></td>
                     <td class="p-3 text-sm font-bold text-slate-600">${p.stockMM + p.stockMax}</td>
                 </tr>`).join('');
-        
+
         tableBody.querySelectorAll('.stock-btn').forEach(btn => {
             btn.classList.add('w-8', 'h-8', 'flex', 'items-center', 'justify-center', 'bg-slate-200/50', 'text-slate-700', 'rounded-full', 'font-bold', 'text-lg', 'hover:bg-slate-300/50', 'transition-colors');
             btn.addEventListener('click', handleStockUpdate);
         });
     }
-    
+
     const renderProductPage = () => {
         const form = document.getElementById('product-form');
         const tableBody = document.getElementById('product-table-body');
-        document.getElementById('product-scan-btn').addEventListener('click', () => startScanner('product-barcode'));
+        const productScanBtn = document.getElementById('product-scan-btn');
+        if (productScanBtn) productScanBtn.addEventListener('click', () => startScanner('product-barcode'));
 
+        if (!tableBody) return;
         tableBody.innerHTML = appState.productDatabase.map(p => `
             <tr>
                 <td class="p-3 text-sm">${p.model}</td>
@@ -337,72 +404,83 @@ const loadState = async () => {
                 <td class="p-3 text-sm"><button class="text-red-500 hover:underline" data-barcode="${p.barcode}">Delete</button></td>
             </tr>`).join('');
 
-        tableBody.querySelectorAll('button[data-barcode]').forEach(btn => btn.addEventListener('click', e => {
-            const barcode = e.target.dataset.barcode;
-            if (confirm(`Delete product with barcode ${barcode}?`)) {
-                appState.productDatabase = appState.productDatabase.filter(p => p.barcode !== barcode);
-                saveState();
-                renderProductPage();
-            }
-        }));
-
-        form.addEventListener('submit', e => {
-            e.preventDefault();
-            const barcode = document.getElementById('product-barcode').value;
-            if (appState.productDatabase.some(p => p.barcode === barcode)) { showMessage('Barcode already exists.'); return; }
-            appState.productDatabase.push({
-                barcode,
-                model: document.getElementById('product-model').value,
-                mrp: parseInt(document.getElementById('product-mrp').value, 10) || 0,
-                incentive: parseInt(document.getElementById('product-incentive').value, 10) || 0,
-                stockMM: parseInt(document.getElementById('product-stock-mm').value, 10) || 0,
-                stockMax: parseInt(document.getElementById('product-stock-max').value, 10) || 0
+        tableBody.querySelectorAll('button[data-barcode]').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const barcode = e.target.dataset.barcode;
+                if (confirm(`Delete product with barcode ${barcode}?`)) {
+                    appState.productDatabase = appState.productDatabase.filter(p => p.barcode !== barcode);
+                    await saveState();
+                    renderProductPage();
+                }
             });
-            saveState();
-            renderProductPage();
-            form.reset();
         });
+
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const barcode = document.getElementById('product-barcode').value;
+                if (appState.productDatabase.some(p => p.barcode === barcode)) { showMessage('Barcode already exists.'); return; }
+                appState.productDatabase.push({
+                    barcode,
+                    model: document.getElementById('product-model').value,
+                    mrp: parseInt(document.getElementById('product-mrp').value, 10) || 0,
+                    incentive: parseInt(document.getElementById('product-incentive').value, 10) || 0,
+                    stockMM: parseInt(document.getElementById('product-stock-mm').value, 10) || 0,
+                    stockMax: parseInt(document.getElementById('product-stock-max').value, 10) || 0
+                });
+                await saveState();
+                renderProductPage();
+                form.reset();
+            }, { once: false });
+        }
     }
 
     const renderLogSalePage = () => {
         renderMonthSelector('log-month-selector-container', true);
-        document.getElementById('sale-date').valueAsDate = new Date();
-        document.getElementById('sale-scan-btn').addEventListener('click', () => startScanner('sale-barcode'));
-        document.getElementById('fetch-btn').addEventListener('click', () => {
+        const saleDate = document.getElementById('sale-date');
+        if (saleDate) saleDate.valueAsDate = new Date();
+        const saleScanBtn = document.getElementById('sale-scan-btn');
+        if (saleScanBtn) saleScanBtn.addEventListener('click', () => startScanner('sale-barcode'));
+        const fetchBtn = document.getElementById('fetch-btn');
+        if (fetchBtn) fetchBtn.addEventListener('click', () => {
             const barcode = document.getElementById('sale-barcode').value;
             const product = appState.productDatabase.find(p => p.barcode === barcode);
             if (product) {
-                document.getElementById('sale-model').value = product.model;
-                document.getElementById('sale-mrp').value = product.mrp;
+                const saleModel = document.getElementById('sale-model');
+                const saleMrp = document.getElementById('sale-mrp');
+                if (saleModel) saleModel.value = product.model;
+                if (saleMrp) saleMrp.value = product.mrp;
             } else { showMessage('Product not found.'); }
         });
-        document.getElementById('sales-form').addEventListener('submit', addSale);
+        const salesForm = document.getElementById('sales-form');
+        if (salesForm) salesForm.addEventListener('submit', addSale);
     }
 
     const renderSalesDataPage = () => {
         renderMonthSelector('data-month-selector-container', false);
         renderSalesTable();
-        document.getElementById('export-btn').addEventListener('click', exportToExcel);
+        const exportBtn = document.getElementById('export-btn');
+        if (exportBtn) exportBtn.addEventListener('click', exportToExcel);
     }
-    
+
     const renderReportPage = () => {
        renderMonthSelector('report-month-selector-container', true);
        renderSalesReport(appState.currentMonthView);
     }
-    
+
     // --- CORE LOGIC ---
-    const handleStockUpdate = e => {
+    const handleStockUpdate = async (e) => {
         const { barcode, shop, action } = e.currentTarget.dataset;
         const product = appState.productDatabase.find(p => p.barcode === barcode);
         if (!product) return;
         const stockField = shop === 'MM' ? 'stockMM' : 'stockMax';
         if (action === 'incr') product[stockField]++;
         else if (action === 'decr' && product[stockField] > 0) product[stockField]--;
-        saveState();
+        await saveState();
         renderStockPage();
     }
-    
-    const addSale = e => {
+
+    const addSale = async (e) => {
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
@@ -418,7 +496,7 @@ const loadState = async () => {
         if (product[stockField] <= 0) { showMessage(`Out of stock for ${product.model} at ${shop === 'MM' ? 'MM Mobiles' : 'Max'}.`); return; }
 
         product[stockField]--;
-        
+
         const salesInMonth = appState.salesLedger[monthKey].sales;
         salesInMonth.push({
             sl: salesInMonth.length + 1,
@@ -432,20 +510,21 @@ const loadState = async () => {
             name: formData.get('name'),
             barcode: barcode,
         });
-        saveState();
+        await saveState();
         showMessage("Sale logged successfully!");
         form.reset();
-        document.getElementById('sale-date').valueAsDate = new Date();
+        const saleDate = document.getElementById('sale-date');
+        if (saleDate) saleDate.valueAsDate = new Date();
     }
 
-    const deleteSale = (saleId, monthKey) => {
+    const deleteSale = async (saleId, monthKey) => {
         if (!appState.salesLedger[monthKey]) return;
         const salesInMonth = appState.salesLedger[monthKey].sales;
         const saleIndex = salesInMonth.findIndex(s => s.id === saleId);
         if (saleIndex === -1) return;
 
         const [saleToDelete] = salesInMonth.splice(saleIndex, 1);
-        
+
         const product = appState.productDatabase.find(p => p.barcode === saleToDelete.barcode);
         if (product) {
             const stockField = saleToDelete.shop === 'MM' ? 'stockMM' : 'stockMax';
@@ -453,7 +532,7 @@ const loadState = async () => {
         }
 
         salesInMonth.forEach((s, i) => s.sl = i + 1);
-        saveState();
+        await saveState();
         renderSalesTable();
     }
 
@@ -461,13 +540,14 @@ const loadState = async () => {
         const container = document.getElementById(containerId);
         if(!container) return;
         const monthKeys = Object.keys(appState.salesLedger).sort().reverse();
-        
+
         let options = `${!monthsOnly ? '<option value="all-time">All-Time Sales</option>' : ''}` +
             monthKeys.map(key => `<option value="${key}">${appState.salesLedger[key].name}</option>`).join('');
 
         if (monthKeys.length === 0 && monthsOnly) {
              container.innerHTML = `<button id="start-month-btn" class="brand-gradient text-white px-4 py-2 rounded-lg text-sm font-semibold">Start First Log</button>`;
-             document.getElementById('start-month-btn').addEventListener('click', () => newMonthModal.classList.remove('hidden'));
+             const startBtn = document.getElementById('start-month-btn');
+             if (startBtn) startBtn.addEventListener('click', () => newMonthModal.classList.remove('hidden'));
              return;
         }
 
@@ -476,17 +556,19 @@ const loadState = async () => {
 
         const selector = document.getElementById(`month-selector-${containerId}`);
         selector.value = appState.currentMonthView;
-        selector.addEventListener('change', e => {
+        selector.addEventListener('change', async (e) => {
             appState.currentMonthView = e.target.value;
-            saveState();
+            await saveState();
             const currentPageId = document.querySelector('.page:not(.hidden)').id.replace('page-', '');
             showPage(currentPageId);
         });
-        document.getElementById('add-month-btn').addEventListener('click', () => newMonthModal.classList.remove('hidden'));
+        const addBtn = document.getElementById('add-month-btn');
+        if (addBtn) addBtn.addEventListener('click', () => newMonthModal.classList.remove('hidden'));
     }
 
     const renderSalesTable = () => {
         const tableBody = document.getElementById('sales-table-body');
+        if (!tableBody) return;
         let salesToDisplay = [];
         const isAllTime = appState.currentMonthView === 'all-time';
         if (isAllTime) {
@@ -495,8 +577,10 @@ const loadState = async () => {
             salesToDisplay = appState.salesLedger[appState.currentMonthView].sales.map(sale => ({...sale, monthKey: appState.currentMonthView}));
         }
 
-        document.getElementById('sales-period-total').textContent = formatCurrency(salesToDisplay.reduce((sum, s) => sum + s.mrp, 0));
-        document.getElementById('incentives-period-total').textContent = formatCurrency(salesToDisplay.reduce((sum, s) => sum + (s.incentive || 0), 0));
+        const salesPeriodTotalEl = document.getElementById('sales-period-total');
+        if (salesPeriodTotalEl) salesPeriodTotalEl.textContent = formatCurrency(salesToDisplay.reduce((sum, s) => sum + s.mrp, 0));
+        const incentivesPeriodTotalEl = document.getElementById('incentives-period-total');
+        if (incentivesPeriodTotalEl) incentivesPeriodTotalEl.textContent = formatCurrency(salesToDisplay.reduce((sum, s) => sum + (s.incentive || 0), 0));
 
         tableBody.innerHTML = salesToDisplay.length === 0 ? `<tr><td colspan="9" class="text-center p-6 text-slate-500">No sales data.</td></tr>` : 
             salesToDisplay.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((sale, index) => `
@@ -510,19 +594,19 @@ const loadState = async () => {
                     <td class="p-3 text-sm"><button class="text-red-500 hover:underline" data-id="${sale.id}" data-month="${sale.monthKey}">Delete</button></td>
                 </tr>`).join('');
 
-        tableBody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', e => {
+        tableBody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async (e) => {
              const saleId = parseInt(e.target.dataset.id, 10);
              const monthKey = e.target.dataset.month;
              if(confirm('Delete this sale? Stock will be restored.')) {
-                 deleteSale(saleId, monthKey);
+                 await deleteSale(saleId, monthKey);
              }
         }));
     }
-    
+
     const renderSalesReport = (monthKey) => {
         const reportContent = document.getElementById('report-content');
         if (monthKey === 'all-time' || !appState.salesLedger[monthKey] || appState.salesLedger[monthKey].sales.length === 0) {
-            reportContent.innerHTML = `<div class="text-center py-12 text-slate-500"><p class="font-semibold text-lg">No sales data.</p><p>Select a month to view its report.</p></div>`;
+            if (reportContent) reportContent.innerHTML = `<div class="text-center py-12 text-slate-500"><p class="font-semibold text-lg">No sales data.</p><p>Select a month to view its report.</p></div>`;
             return;
         }
 
@@ -532,8 +616,8 @@ const loadState = async () => {
         const unitsSold = sales.length;
         const modelCounts = sales.reduce((acc, s) => { acc[s.model] = (acc[s.model] || 0) + 1; return acc; }, {});
         const bestSeller = Object.keys(modelCounts).reduce((a, b) => modelCounts[a] > modelCounts[b] ? a : b, 'N/A');
-        
-        reportContent.innerHTML = `
+
+        if (reportContent) reportContent.innerHTML = `
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <div class="p-4 bg-white/40 rounded-lg"><h4 class="text-sm font-semibold text-slate-500">Total Revenue</h4><p class="text-2xl font-bold">${formatCurrency(totalRevenue)}</p></div>
                 <div class="p-4 bg-white/40 rounded-lg"><h4 class="text-sm font-semibold text-slate-500">Total Incentives</h4><p class="text-2xl font-bold text-green-600">${formatCurrency(totalIncentives)}</p></div>
@@ -546,7 +630,7 @@ const loadState = async () => {
         try {
             let salesToExport = [];
             let filename = 'sales_report.xlsx';
-            
+
             if (appState.currentMonthView === 'all-time') {
                 salesToExport = Object.values(appState.salesLedger).flatMap(month => month.sales);
                 filename = `all_time_sales_${new Date().toISOString().split('T')[0]}.xlsx`;
@@ -560,7 +644,7 @@ const loadState = async () => {
                 'SL No.': s.sl, 'Model': s.model, 'Date': s.date, 'Shop': s.shop, 'MRP': s.mrp, 'Incentive': s.incentive || 0,
                 'Payment Mode': s.mode, 'Customer Name': s.name, 'Barcode': s.barcode
             }));
-            
+
             const ws = XLSX.utils.json_to_sheet(dataForSheet);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Sales Data");
@@ -578,15 +662,16 @@ const loadState = async () => {
     }
     const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
-    // --- INITIALIZATION ---const initializeApp = async () => {
-    await loadState();   // wait until Firestore loads
-    const initialPage = window.location.hash.substring(1) || 'home';
-    showPage(initialPage);
-        
+    // --- INITIALIZATION ---
+    const initializeApp = async () => {
+        await loadState();
+        const initialPage = window.location.hash.substring(1) || 'home';
+        showPage(initialPage);
+
         window.addEventListener('hashchange', () => showPage(window.location.hash.substring(1) || 'home'));
-        messageCloseBtn.addEventListener('click', () => messageModal.classList.add('hidden'));
-        scannerCancelBtn.addEventListener('click', () => stopScanner());
-        newMonthForm.addEventListener('submit', (e) => {
+        if (messageCloseBtn) messageCloseBtn.addEventListener('click', () => messageModal.classList.add('hidden'));
+        if (scannerCancelBtn) scannerCancelBtn.addEventListener('click', () => stopScanner());
+        if (newMonthForm) newMonthForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const monthInput = document.getElementById('new-month-input').value;
             if (!monthInput) return;
@@ -595,13 +680,13 @@ const loadState = async () => {
 
             if (appState.salesLedger[monthInput]) { showMessage(`Log for ${monthName} already exists.`); return; }
             appState.salesLedger[monthInput] = { name: monthName, sales: [] };
-            appState.currentMonthView = monthInput; // FIX: Set current view to the new month
-            saveState();
+            appState.currentMonthView = monthInput; // Set current view to the new month
+            await saveState();
             newMonthModal.classList.add('hidden');
             const currentPageId = document.querySelector('.page:not(.hidden)').id.replace('page-', '');
-            showPage(currentPageId); // FIX: Re-render the current view to update selectors
+            showPage(currentPageId); // Re-render the current view to update selectors
         });
-        newMonthCancelBtn.addEventListener('click', () => newMonthModal.classList.add('hidden'));
+        if (newMonthCancelBtn) newMonthCancelBtn.addEventListener('click', () => newMonthModal.classList.add('hidden'));
     }
 
     initializeApp();
