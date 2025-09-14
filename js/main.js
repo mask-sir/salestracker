@@ -189,40 +189,36 @@ document.addEventListener('DOMContentLoaded', () => {
         window.scrollTo(0, 0);
     }
     
-    // --- LOCAL STORAGE ---
-    const saveState = () => {
-        try {
-            localStorage.setItem('salesProData_v3', JSON.stringify(appState));
-        } catch (e) {
-            console.error("Error saving state to localStorage:", e);
-        }
-    }
-    const loadState = () => {
-        try {
-            const savedData = localStorage.getItem('salesProData_v3');
-            if (savedData) {
-                appState = JSON.parse(savedData);
-            } else {
-                // Setup with new structure if no data exists
-                appState.productDatabase = [{ barcode: '8901234567890', model: 'VIVO Y200 (8+128)', mrp: 18999, stockMM: 10, stockMax: 5 }];
-                appState.productDatabase.push({ barcode: '8901234567891', model: 'VIVO Y19 (6+128)', mrp: 12499, stockMM: 8, stockMax: 12 });
-                const today = new Date();
-                const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-                const monthName = today.toLocaleString('default', { month: 'long', year: 'numeric' });
-                appState.salesLedger = {}; // Ensure it's an object
-                appState.salesLedger[monthKey] = { name: monthName, sales: [] };
-                appState.currentMonthView = monthKey;
-            }
-            if (!appState.currentMonthView) {
-                const monthKeys = Object.keys(appState.salesLedger);
-                appState.currentMonthView = monthKeys.length > 0 ? monthKeys[monthKeys.length - 1] : 'all-time';
-            }
-        } catch (e) {
-            console.error("Error loading state from localStorage:", e);
-            // Reset to a default state if there's a parsing error
-            appState = { productDatabase: [], salesLedger: {}, currentMonthView: 'all-time' };
-        }
-    }
+    // --- FIRESTORE FUNCTIONS ---
+// Products
+async function saveProduct(product) {
+  await db.collection("products").doc(product.barcode).set(product);
+}
+
+async function deleteProduct(barcode) {
+  await db.collection("products").doc(barcode).delete();
+}
+
+async function loadProducts() {
+  const snapshot = await db.collection("products").get();
+  appState.productDatabase = snapshot.docs.map(doc => doc.data());
+}
+
+// Sales
+async function saveSale(monthKey, sale) {
+  await db.collection("sales").doc(monthKey)
+    .collection("entries").doc(String(sale.id)).set(sale);
+}
+
+async function deleteSaleFromDb(monthKey, saleId) {
+  await db.collection("sales").doc(monthKey)
+    .collection("entries").doc(String(saleId)).delete();
+}
+
+async function loadSales(monthKey) {
+  const snapshot = await db.collection("sales").doc(monthKey).collection("entries").get();
+  return snapshot.docs.map(doc => doc.data());
+}
 
     // --- BARCODE SCANNER ---
     const startScanner = () => {
