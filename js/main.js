@@ -15,8 +15,8 @@ firebase.initializeApp(firebaseConfig);
 
 // Firestore reference
 const db = firebase.firestore();
-document.addEventListener('DOMContentLoaded', () => {
 
+document.addEventListener('DOMContentLoaded', () => {
     // --- App State ---
     let appState = {
         productDatabase: [],
@@ -190,35 +190,134 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- FIRESTORE FUNCTIONS ---
-// Products
-async function saveProduct(product) {
-  await db.collection("products").doc(product.barcode).set(product);
-}
+    // Products
+    async function saveProduct(product) {
+        try {
+            await db.collection("products").doc(product.barcode).set(product);
+            showMessage("Product saved successfully!");
+        } catch (error) {
+            console.error("Error saving product:", error);
+            showMessage("Error saving product: " + error.message);
+        }
+    }
 
-async function deleteProduct(barcode) {
-  await db.collection("products").doc(barcode).delete();
-}
+    async function deleteProduct(barcode) {
+        try {
+            await db.collection("products").doc(barcode).delete();
+            showMessage("Product deleted successfully!");
+        } catch (error) {
+            console.error("Error deleting product:", error);
+            showMessage("Error deleting product: " + error.message);
+        }
+    }
 
-async function loadProducts() {
-  const snapshot = await db.collection("products").get();
-  appState.productDatabase = snapshot.docs.map(doc => doc.data());
-}
+    async function loadProducts() {
+        try {
+            const snapshot = await db.collection("products").get();
+            appState.productDatabase = snapshot.docs.map(doc => doc.data());
+        } catch (error) {
+            console.error("Error loading products:", error);
+            showMessage("Error loading products: " + error.message);
+        }
+    }
 
-// Sales
-async function saveSale(monthKey, sale) {
-  await db.collection("sales").doc(monthKey)
-    .collection("entries").doc(String(sale.id)).set(sale);
-}
+    // Sales
+    async function saveSale(monthKey, sale) {
+        try {
+            await db.collection("sales").doc(monthKey)
+                .collection("entries").doc(String(sale.id)).set(sale);
+            showMessage("Sale logged successfully!");
+        } catch (error) {
+            console.error("Error saving sale:", error);
+            showMessage("Error saving sale: " + error.message);
+        }
+    }
 
-async function deleteSaleFromDb(monthKey, saleId) {
-  await db.collection("sales").doc(monthKey)
-    .collection("entries").doc(String(saleId)).delete();
-}
+    async function deleteSaleFromDb(monthKey, saleId) {
+        try {
+            await db.collection("sales").doc(monthKey)
+                .collection("entries").doc(String(saleId)).delete();
+            showMessage("Sale deleted successfully!");
+        } catch (error) {
+            console.error("Error deleting sale:", error);
+            showMessage("Error deleting sale: " + error.message);
+        }
+    }
 
-async function loadSales(monthKey) {
-  const snapshot = await db.collection("sales").doc(monthKey).collection("entries").get();
-  return snapshot.docs.map(doc => doc.data());
-}
+    async function loadSales(monthKey) {
+        try {
+            const snapshot = await db.collection("sales").doc(monthKey).collection("entries").get();
+            return snapshot.docs.map(doc => doc.data());
+        } catch (error) {
+            console.error("Error loading sales:", error);
+            showMessage("Error loading sales: " + error.message);
+            return [];
+        }
+    }
+
+    // App State Management
+    async function saveState() {
+        try {
+            // Save current month view
+            await db.collection("appState").doc("settings").set({
+                currentMonthView: appState.currentMonthView
+            });
+
+            // Save sales ledger structure
+            await db.collection("appState").doc("salesLedger").set({
+                months: Object.keys(appState.salesLedger).map(key => ({
+                    key,
+                    name: appState.salesLedger[key].name
+                }))
+            });
+
+        } catch (error) {
+            console.error("Error saving app state:", error);
+        }
+    }
+
+    async function loadState() {
+        try {
+            // Load products
+            await loadProducts();
+
+            // Load app settings
+            const settingsDoc = await db.collection("appState").doc("settings").get();
+            if (settingsDoc.exists) {
+                const settings = settingsDoc.data();
+                appState.currentMonthView = settings.currentMonthView || '';
+            }
+
+            // Load sales ledger structure
+            const salesLedgerDoc = await db.collection("appState").doc("salesLedger").get();
+            if (salesLedgerDoc.exists) {
+                const salesLedgerData = salesLedgerDoc.data();
+                appState.salesLedger = {};
+                
+                // Initialize ledger structure
+                for (const month of salesLedgerData.months || []) {
+                    appState.salesLedger[month.key] = {
+                        name: month.name,
+                        sales: await loadSales(month.key)
+                    };
+                }
+            }
+
+            // Set default current month view if none exists
+            if (!appState.currentMonthView) {
+                const monthKeys = Object.keys(appState.salesLedger);
+                if (monthKeys.length > 0) {
+                    appState.currentMonthView = monthKeys[monthKeys.length - 1];
+                } else {
+                    appState.currentMonthView = 'all-time';
+                }
+            }
+
+        } catch (error) {
+            console.error("Error loading app state:", error);
+            showMessage("Error loading data: " + error.message);
+        }
+    }
 
     // --- BARCODE SCANNER ---
     const startScanner = () => {
@@ -337,16 +436,16 @@ async function loadSales(monthKey) {
             tableBody.appendChild(row);
         });
 
-        tableBody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', (e) => {
+        tableBody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async (e) => {
             const barcode = e.target.dataset.barcode;
             if (confirm(`Are you sure you want to delete product with barcode ${barcode}? This is irreversible.`)) {
+                await deleteProduct(barcode);
                 appState.productDatabase = appState.productDatabase.filter(p => p.barcode !== barcode);
-                saveState();
                 renderProductPage();
             }
         }));
 
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const barcode = document.getElementById('product-barcode').value;
             if (!barcode.trim()) {
@@ -364,8 +463,9 @@ async function loadSales(monthKey) {
                 stockMM: parseInt(document.getElementById('product-stock-mm').value, 10) || 0,
                 stockMax: parseInt(document.getElementById('product-stock-max').value, 10) || 0
             };
+            
+            await saveProduct(newProduct);
             appState.productDatabase.push(newProduct);
-            saveState();
             renderProductPage();
             form.reset();
         });
@@ -399,10 +499,10 @@ async function loadSales(monthKey) {
     const renderReportPage = () => {
        renderMonthSelector('report-month-selector-container', true);
        renderSalesReport(appState.currentMonthView);
-    }
+       }
     
     // --- CORE LOGIC ---
-    const handleStockUpdate = (e) => {
+    const handleStockUpdate = async (e) => {
         const { barcode, shop, action } = e.currentTarget.dataset;
         const product = appState.productDatabase.find(p => p.barcode === barcode);
         if (!product) return;
@@ -412,11 +512,11 @@ async function loadSales(monthKey) {
         if (action === 'incr') product[stockField]++;
         else if (action === 'decr' && product[stockField] > 0) product[stockField]--;
         
-        saveState();
+        await saveProduct(product);
         renderStockPage();
     }
     
-    const addSale = (e) => {
+    const addSale = async (e) => {
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
@@ -453,13 +553,18 @@ async function loadSales(monthKey) {
         };
         
         salesInMonth.push(newSale);
-        saveState();
-        showMessage("Sale logged successfully!");
+        
+        // Save to Firebase
+        await Promise.all([
+            saveProduct(product),
+            saveSale(monthKey, newSale)
+        ]);
+        
         form.reset();
         document.getElementById('sale-date').valueAsDate = new Date();
     }
 
-    const deleteSale = (saleId, monthKey) => {
+    const deleteSale = async (saleId, monthKey) => {
         if (!appState.salesLedger[monthKey]) return;
         const salesInMonth = appState.salesLedger[monthKey].sales;
         const saleIndex = salesInMonth.findIndex(s => s.id === saleId);
@@ -475,7 +580,12 @@ async function loadSales(monthKey) {
 
         salesInMonth.forEach((s, i) => s.sl = i + 1);
 
-        saveState();
+        // Save to Firebase
+        await Promise.all([
+            product ? saveProduct(product) : Promise.resolve(),
+            deleteSaleFromDb(monthKey, saleId)
+        ]);
+        
         renderSalesTable();
     }
 
@@ -504,9 +614,9 @@ async function loadSales(monthKey) {
         const selector = document.getElementById(`month-selector-${containerId}`);
         selector.value = appState.currentMonthView;
 
-        selector.addEventListener('change', (e) => {
+        selector.addEventListener('change', async (e) => {
             appState.currentMonthView = e.target.value;
-            saveState();
+            await saveState();
             const currentPageId = document.querySelector('.page:not(.hidden)').id.replace('page-', '');
             showPage(currentPageId);
         });
@@ -550,11 +660,11 @@ async function loadSales(monthKey) {
             tableBody.appendChild(row);
         });
 
-        tableBody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', (e) => {
+        tableBody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async (e) => {
              const saleId = parseInt(e.target.dataset.id, 10);
              const monthKey = e.target.dataset.month;
              if(confirm('Are you sure you want to delete this sale? This will restore the stock count.')) {
-                 deleteSale(saleId, monthKey);
+                 await deleteSale(saleId, monthKey);
              }
         }));
     }
@@ -633,8 +743,11 @@ async function loadSales(monthKey) {
     const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
     // --- INITIALIZATION ---
-    const initializeApp = () => {
-        loadState();
+    const initializeApp = async () => {
+        showMessage("Loading data from Firebase...");
+        await loadState();
+        messageModal.classList.add('hidden');
+        
         const initialPage = window.location.hash.substring(1) || 'home';
         showPage(initialPage);
         
@@ -646,7 +759,7 @@ async function loadSales(monthKey) {
         messageCloseBtn.addEventListener('click', () => messageModal.classList.add('hidden'));
         scannerCancelBtn.addEventListener('click', stopScanner);
 
-        newMonthForm.addEventListener('submit', (e) => {
+        newMonthForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const monthInput = document.getElementById('new-month-input').value; // YYYY-MM
             if (!monthInput) {
@@ -662,7 +775,8 @@ async function loadSales(monthKey) {
             }
             appState.salesLedger[monthInput] = { name: monthName, sales: [] };
             appState.currentMonthView = monthInput;
-            saveState();
+            
+            await saveState();
             newMonthModal.classList.add('hidden');
             const currentPageId = document.querySelector('.page:not(.hidden)').id.replace('page-', '');
             showPage(currentPageId);
