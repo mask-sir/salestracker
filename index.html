@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="antialiased text-slate-800">
-    
+
     <!-- Header with Hamburger Menu -->
     <header class="glass-ui sticky top-0 z-20 p-4 flex items-center justify-between md:hidden">
         <button id="hamburger-btn" class="p-2">
@@ -30,34 +30,28 @@
     <div class="flex">
         <!-- Sidebar Navigation -->
         <div id="sidebar-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden opacity-0"></div>
-        
+
         <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 p-4 z-40 md:relative md:transform-none">
              <div class="p-4 text-center md:text-left hidden md:block">
                 <h1 class="text-2xl font-extrabold text-transparent bg-clip-text brand-gradient">Sales Pro</h1>
             </div>
             <nav id="main-nav" class="mt-8 flex flex-col space-y-2">
                 <a href="#home" class="nav-link active flex items-center gap-3 p-3 rounded-lg text-slate-700 hover:bg-white/50 transition-colors duration-200">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a2 2 0 012 2v4a1 1 0 001 1m-6 0h6"></path></svg>
                     <span>Home</span>
                 </a>
                  <a href="#log-sale" class="nav-link flex items-center gap-3 p-3 rounded-lg text-slate-700 hover:bg-white/50 transition-colors duration-200">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <span>Log Sale</span>
                 </a>
                 <a href="#stock" class="nav-link flex items-center gap-3 p-3 rounded-lg text-slate-700 hover:bg-white/50 transition-colors duration-200">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                     <span>Stock Overview</span>
                 </a>
                 <a href="#products" class="nav-link flex items-center gap-3 p-3 rounded-lg text-slate-700 hover:bg-white/50 transition-colors duration-200">
-                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Manage Products</span>
                 </a>
                 <a href="#sales-data" class="nav-link flex items-center gap-3 p-3 rounded-lg text-slate-700 hover:bg-white/50 transition-colors duration-200">
-                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <span>Sales Data</span>
                 </a>
                  <a href="#report" class="nav-link flex items-center gap-3 p-3 rounded-lg text-slate-700 hover:bg-white/50 transition-colors duration-200">
-                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2v-6m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                     <span>Sales Report</span>
                 </a>
             </nav>
@@ -106,26 +100,25 @@
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
     </a>
 
-    <!-- Firebase Setup -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+<script type="module">
+    // Firebase initialized here so main.js can use window.db
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-        const firebaseConfig = {
-          apiKey: "AIzaSyCAjL7T72-kq6DL7gWzzfpqswcNTqdkjZ0",
-          authDomain: "sales-pro-83fc2.firebaseapp.com",
-          projectId: "sales-pro-83fc2",
-          storageBucket: "sales-pro-83fc2.firebasestorage.app",
-          messagingSenderId: "727475911328",
-          appId: "1:727475911328:web:b484d326d578d58819a7c5"
-        };
+    const firebaseConfig = {
+      apiKey: "AIzaSyCAjL7T72-kq6DL7gWzzfpqswcNTqdkjZ0",
+      authDomain: "sales-pro-83fc2.firebaseapp.com",
+      projectId: "sales-pro-83fc2",
+      storageBucket: "sales-pro-83fc2.firebasestorage.app",
+      messagingSenderId: "727475911328",
+      appId: "1:727475911328:web:b484d326d578d58819a7c5"
+    };
 
-        const firebaseApp = initializeApp(firebaseConfig);
-        const db = getFirestore(firebaseApp);
-        window.db = db; // expose globally
-    </script>
+    const firebaseApp = initializeApp(firebaseConfig);
+    const db = getFirestore(firebaseApp);
+    window.db = db;
+</script>
 
-    <!-- Your App -->
-    <script src="js/main.js" type="module"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
