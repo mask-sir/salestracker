@@ -1,24 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Glass UI Sales Dashboard</title>
-    <!-- Tailwind CSS (CDN) -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Glass UI Sales Dashboard (Firebase)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <!-- Tone.js for sound effects -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-    <!-- Google Fonts: Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Firebase (compat libraries for simpler migration) -->
+    <!-- Replace the config object in js/firebase-config.js with your Firebase project's credentials -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body class="antialiased text-slate-800">
-    
+    <!-- The app layout is unchanged - see original project for content -->
     <!-- Header with Hamburger Menu -->
     <header class="glass-ui sticky top-0 z-20 p-4 flex items-center justify-between md:hidden">
         <button id="hamburger-btn" class="p-2">
@@ -30,7 +32,6 @@
     <div class="flex">
         <!-- Sidebar Navigation -->
         <div id="sidebar-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden opacity-0"></div>
-        
         <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 p-4 z-40 md:relative md:transform-none">
              <div class="p-4 text-center md:text-left hidden md:block">
                 <h1 class="text-2xl font-extrabold text-transparent bg-clip-text brand-gradient">Sales Pro</h1>
@@ -74,7 +75,7 @@
         </main>
     </div>
 
-    <!-- Modals -->
+    <!-- Modals (unchanged) -->
     <div id="message-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
         <div class="modal glass-ui rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
             <p id="modal-message" class="text-lg mb-6 font-medium"></p>
@@ -105,8 +106,9 @@
     <a href="#log-sale" title="Log a New Sale" class="fixed bottom-6 right-6 z-30 w-16 h-16 flex items-center justify-center rounded-full brand-gradient text-white shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
     </a>
-<script src="js/main.js"></script>
+
+    <!-- Firebase config (separate file) and main script -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/main.firebase.js"></script>
 </body>
 </html>
-
-
